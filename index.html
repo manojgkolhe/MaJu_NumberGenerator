@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MaJu Lucky Number Finder</title>
+
+    <!-- Link to Google Fonts for stylish fonts -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    
+    <!-- Favicon link -->
+    <link rel="icon" href="favicon.ico" type="image/x-icon" />
+
+    <!-- Add Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+      /* Global Styles */
+      body {
+        font-family: 'Inter', sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f8f9fa;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        height: 100vh;
+        overflow-y: auto; /* Allow scrolling when content overflows */
+        position: relative; /* Required for pseudo-element positioning */
+      }
+
+      /* Set background image and opacity */
+      body::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: url('juli_image.jpeg'); /* Replace with Juli's JPG file path */
+        background-size: cover; /* Cover the entire viewport */
+        background-position: center;
+        opacity: 0.5; /* 50% opacity */
+        z-index: -1; /* Ensure content is above the background */
+      }
+
+      h1 {
+        font-family: 'Indie Flower', cursive; /* Stylish handwritten font */
+        font-size: 3rem;
+        color: red; /* Red color */
+        margin-bottom: 30px;
+        text-align: center;
+        text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Optional text shadow */
+      }
+
+      /* Buttons */
+      button {
+        background-color: #007bff;
+        color: white;
+        font-size: 1rem;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 20px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        margin: 10px;
+      }
+
+      button:hover {
+        background-color: #0056b3;
+      }
+
+      /* Container for Stats and Graph */
+      .container {
+        width: 80%;
+        max-width: 1200px;
+        padding: 20px;
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+        margin-bottom: 30px;
+      }
+
+      /* Stats Section */
+      #stats {
+        margin-bottom: 30px;
+        padding: 20px;
+        background-color: #f1f1f1;
+        border-radius: 8px;
+      }
+
+      #stats ul {
+        list-style-type: none;
+        padding: 0;
+      }
+
+      #stats li {
+        padding: 8px;
+        font-size: 1.1rem;
+        color: #343a40;
+      }
+
+      /* Graph Section */
+      canvas {
+        max-width: 100%;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      /* Output Display */
+      #output {
+        margin-top: 20px;
+        white-space: pre-wrap;
+        text-align: left;
+        background-color: #f8f9fa;
+        padding: 15px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        width: 100%;
+        max-width: 900px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Make the layout responsive */
+      @media (max-width: 768px) {
+        body {
+          padding: 10px;
+        }
+
+        .container {
+          width: 100%;
+        }
+
+        h1 {
+          font-size: 2rem;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>MaJu Lucky Number Finder</h1>
+
+    <div class="container">
+      <button id="selectFile">Select Data File</button>
+
+      <div id="stats"></div>
+
+      <canvas id="statsChart"></canvas>
+
+      <button id="generate">Generate Numbers</button>
+
+      <pre id="output">Press "Generate Numbers" to see results here...</pre>
+    </div>
+
+    <script>
+      let filePath = "";
+
+      // Open file dialog to select file
+      document
+        .getElementById("selectFile")
+        .addEventListener("click", async () => {
+          try {
+            filePath = await window.electronAPI.openFileDialog();
+            if (filePath) {
+              // Read the file and show stats
+              const stats = await window.electronAPI.readFileData(filePath);
+              displayStats(stats);
+              generateGraph(stats);
+            }
+          } catch (error) {
+            alert(`Error: ${error.message}`);
+          }
+        });
+
+      // Generate numbers using selected file data
+      document
+        .getElementById("generate")
+        .addEventListener("click", async () => {
+          if (!filePath) {
+            alert("Please select a data file first!");
+            return;
+          }
+
+          try {
+            const response = await fetch(filePath);
+            const text = await response.text();
+            const data = text
+              .trim()
+              .split("\n")
+              .map((line) => line.split(" ").map(Number));
+
+            // Call the backend function to generate numbers
+            const generatedNumbers = await window.electronAPI.generateNumbers(
+              data
+            );
+
+            // Format and display the generated numbers
+            const formattedOutput = generatedNumbers
+              .map((arr) => arr.join(", "))
+              .join("\n");
+            document.getElementById("output").innerText = formattedOutput;
+          } catch (error) {
+            alert(`Error: ${error.message}`);
+          }
+        });
+
+      // Display stats from the file
+      function displayStats(stats) {
+        const mostOccurring = stats.mostOccurring
+            .map(item => `<li>${item.number}: ${item.count} times</li>`)
+            .join("");
+        const leastOccurring = stats.leastOccurring
+            .map(item => `<li>${item.number}: ${item.count} times</li>`)
+            .join("");
+        const consecutive = stats.consecutiveRepeats
+            .sort((a, b) => a - b)  // Sort the numbers in increasing order
+            .map(item => `${item}`)  // Convert each item to a string
+            .join(", ");  // Join the numbers with a comma and space
+        
+    
+        document.getElementById("stats").innerHTML = `
+                <strong>File Stats:</strong>
+                <ul>
+                    <li>Total numbers: ${stats.totalNumbers}</li>
+                    <li>Unique numbers: ${stats.uniqueNumbers}</li>
+                    <li>Number of rows: ${stats.numRows}</li>
+                </ul>
+                <strong>Most Occurring Numbers:</strong>
+                <ul>${mostOccurring}</ul>
+                <strong>Least Occurring Numbers:</strong>
+                <ul>${leastOccurring}</ul>
+                <strong>Numbers Repeated Consecutively:</strong>
+                <ul>${consecutive}</ul>
+                <strong>Numbers to Avoid (Most Frequent Repeats):</strong>
+                <ul>${stats.numbersToAvoid
+                    .map(num => `<li>${num}</li>`)
+                    .join("")}</ul>
+            `;
+    }
+    
+
+      // Generate Graphical Stats using Chart.js
+      function generateGraph(stats) {
+        const ctx = document.getElementById("statsChart").getContext("2d");
+        const mostOccurring = stats.mostOccurring.map((item) => item.count);
+        const leastOccurring = stats.leastOccurring.map((item) => item.count);
+
+        const data = {
+          labels: stats.mostOccurring.map((item) => item.number),
+          datasets: [
+            {
+              label: "Most Occurring Numbers",
+              data: mostOccurring,
+              backgroundColor: "rgba(54, 162, 235, 0.2)",
+              borderColor: "rgba(54, 162, 235, 1)",
+              borderWidth: 1,
+            },
+            {
+              label: "Least Occurring Numbers",
+              data: leastOccurring,
+              backgroundColor: "rgba(255, 99, 132, 0.2)",
+              borderColor: "rgba(255, 99, 132, 1)",
+              borderWidth: 1,
+            },
+          ],
+        };
+
+        new Chart(ctx, {
+          type: "bar",
+          data: data,
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true,
+              },
+            },
+          },
+        });
+      }
+    </script>
+  </body>
+</html>
